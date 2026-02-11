@@ -12,6 +12,17 @@ import os
 import atexit
 import argparse
 import sys
+import io
+
+# --- Set default encoding to UTF-8 ---
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+if sys.stdin.encoding != 'utf-8':
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+# ------------------------------------
+
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime, timedelta

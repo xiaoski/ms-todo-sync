@@ -1,6 +1,6 @@
 [project]
 name = "ms-todo-sync"
-version = "1.0.0"
+version = "1.0.1"
 description = "A CLI tool to manage Microsoft To Do tasks via Microsoft Graph API"
 readme = "README.md"
 requires-python = ">=3.9"
