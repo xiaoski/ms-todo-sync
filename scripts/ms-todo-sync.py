@@ -35,7 +35,7 @@ class MicrosoftTodoClient:
     # Default client ID (built-in)
     DEFAULT_CLIENT_ID = "82faeadf-5106-4aa0-bb0d-2c94b300e92a"
 
-    def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None, tenant_id: str = "common", cache_file: Optional[str] = None):
+    def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None, tenant_id: str = "common", cache_file: Optional[str] = None, debug: bool = False):
         """
         Initialize the client
 
@@ -44,6 +44,7 @@ class MicrosoftTodoClient:
             client_secret: Client secret (optional, used for application flow)
             tenant_id: Tenant ID, default is "common"
             cache_file: Token cache file path (optional, default: ~/.mstodo_token_cache.json)
+            debug: Enable debug mode to print API requests and responses (default: False)
         """
         self.client_id = client_id or self.DEFAULT_CLIENT_ID
         self.client_secret = client_secret
@@ -52,6 +53,7 @@ class MicrosoftTodoClient:
         self.scopes = ["Tasks.Read", "Tasks.ReadWrite"]
         self.graph_endpoint = "https://graph.microsoft.com/v1.0"
         self.access_token = None
+        self.debug = debug
 
         # Set cache file path
         if cache_file is None:
@@ -198,6 +200,13 @@ class MicrosoftTodoClient:
 
         url = f"{self.graph_endpoint}{endpoint}"
 
+        if self.debug:
+            print(f"\n🔍 [DEBUG] API Request:")
+            print(f"  Method: {method}")
+            print(f"  URL: {url}")
+            if data:
+                print(f"  Request Body: {json.dumps(data, indent=2, ensure_ascii=False)}")
+
         if method == "GET":
             response = requests.get(url, headers=headers)
         elif method == "POST":
@@ -209,12 +218,32 @@ class MicrosoftTodoClient:
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
 
+        if self.debug:
+            print(f"\n🔍 [DEBUG] API Response:")
+            print(f"  Status Code: {response.status_code}")
+            print(f"  Headers: {dict(response.headers)}")
+
+        if response.status_code >= 400:
+            # Try to parse error response
+            try:
+                error_data = response.json()
+                if self.debug:
+                    print(f"  Error Body: {json.dumps(error_data, indent=2, ensure_ascii=False)}\n")
+            except:
+                pass
+        
         response.raise_for_status()
 
         if response.status_code == 204:  # No Content
+            if self.debug:
+                print(f"  Body: (No Content)\n")
             return {}
 
-        return response.json()
+        response_data = response.json()
+        if self.debug:
+            print(f"  Body: {json.dumps(response_data, indent=2, ensure_ascii=False)}\n")
+        
+        return response_data
 
     # ==================== Task List Management ====================
 
@@ -275,9 +304,11 @@ class MicrosoftTodoClient:
         title: str,
         body: Optional[str] = None,
         due_date: Optional[str] = None,
+        start_date: Optional[str] = None,
         reminder_date: Optional[str] = None,
         importance: str = "normal",
         categories: Optional[List[str]] = None,
+        recurrence: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Create a new task
@@ -287,9 +318,11 @@ class MicrosoftTodoClient:
             title: Task title
             body: Task content/notes (optional)
             due_date: Due date, format: 2026-02-10T09:00:00 (optional)
+            start_date: Start date, format: 2026-02-10T09:00:00 (optional, required for recurrence)
             reminder_date: Reminder date, format: 2026-02-10T09:00:00 (optional)
             importance: Importance level, optional values: low, normal, high (default: normal)
             categories: List of category tags (optional)
+            recurrence: Recurrence pattern (optional)
 
         Returns:
             Created task information
@@ -299,6 +332,9 @@ class MicrosoftTodoClient:
         if body:
             data["body"] = {"content": body, "contentType": "text"}
 
+        if start_date:
+            data["startDateTime"] = {"dateTime": start_date, "timeZone": "UTC"}
+
         if due_date:
             data["dueDateTime"] = {"dateTime": due_date, "timeZone": "UTC"}
 
@@ -307,6 +343,9 @@ class MicrosoftTodoClient:
 
         if categories:
             data["categories"] = categories
+
+        if recurrence:
+            data["recurrence"] = recurrence
 
         return self._make_request(f"/me/todo/lists/{list_id}/tasks", method="POST", data=data)
 
@@ -407,6 +446,20 @@ class MicrosoftTodoClient:
 
         return all_tasks
 
+    def get_default_list(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the default task list (wellknownListName: defaultList)
+
+        Returns:
+            Default list information, returns None if not found
+        """
+        lists = self.get_task_lists()
+        for task_list in lists:
+            if task_list.get("wellknownListName") == "defaultList":
+                return task_list
+        # Fallback: return first list if no default found
+        return lists[0] if lists else None
+
     def find_list_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         """
         Find task list by name
@@ -441,6 +494,69 @@ class MicrosoftTodoClient:
         return None
 
 # ==================== Command Line Interface ====================
+
+
+def _parse_recurrence(recurrence_str: str, start_date: datetime) -> Optional[Dict[str, Any]]:
+    """
+    Parse recurrence string to Microsoft Graph API recurrence object
+    
+    Supported formats:
+    - daily: Repeat every day
+    - weekdays: Repeat on weekdays (Mon-Fri)
+    - weekly: Repeat every week
+    - monthly: Repeat every month
+    - daily:N: Repeat every N days
+    - weekly:N: Repeat every N weeks
+    - monthly:N: Repeat every N months
+    
+    Args:
+        recurrence_str: Recurrence string
+        start_date: Start date for recurrence (required)
+    
+    Returns:
+        Recurrence object for Graph API, or None if invalid format
+    """
+    if not recurrence_str:
+        return None
+    
+    parts = recurrence_str.lower().split(":")
+    pattern_type = parts[0]
+    interval = int(parts[1]) if len(parts) > 1 else 1
+    
+    # Base recurrence structure
+    recurrence = {
+        "pattern": {
+            "interval": interval
+        },
+        "range": {
+            "type": "noEnd",
+            "startDate": start_date.strftime("%Y-%m-%d")
+        }
+    }
+    
+    # Map pattern types
+    if pattern_type == "daily":
+        recurrence["pattern"]["type"] = "daily"
+    elif pattern_type == "weekdays":
+        recurrence["pattern"]["type"] = "weekly"
+        recurrence["pattern"]["daysOfWeek"] = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        recurrence["pattern"]["interval"] = 1
+        recurrence["pattern"]["firstDayOfWeek"] = "sunday"
+    elif pattern_type == "weekly":
+        recurrence["pattern"]["type"] = "weekly"
+        recurrence["pattern"]["daysOfWeek"] = [start_date.strftime("%A").lower()]
+        recurrence["pattern"]["firstDayOfWeek"] = "sunday"
+    elif pattern_type == "monthly":
+        recurrence["pattern"]["type"] = "absoluteMonthly"
+        recurrence["pattern"]["dayOfMonth"] = start_date.day
+    else:
+        print(f"❌ Invalid recurrence pattern: {pattern_type}")
+        print("   Supported: daily, weekdays, weekly, monthly")
+        print("   With interval: daily:2, weekly:3, monthly:2")
+        return None
+    
+    return recurrence
+
 
 def _error_list_not_found(list_name: str):
     """Helper function to display list not found error"""
@@ -521,47 +637,152 @@ def cmd_tasks(args, client):
 
 def cmd_add(args, client):
     """Add a new task"""
-    task_list = client.find_list_by_name(args.list)
-    if not task_list:
-        if args.create_list:
+    # Determine which list to use
+    if args.list:
+        # User specified a list
+        task_list = client.find_list_by_name(args.list)
+        if not task_list:
+            # Auto-create list if it doesn't exist
             task_list = client.create_task_list(args.list)
             print(f"✓ List created: {args.list}")
-        else:
-            _error_list_not_found(args.list)
-            print("💡 Use --create-list parameter to automatically create the list")
+    else:
+        # No list specified, use default list
+        task_list = client.get_default_list()
+        if not task_list:
+            print("❌ No task lists found. Please create a list first.")
             return
 
-    # Calculate due date
+    # Calculate due date (Microsoft To Do API only supports date, not time)
     due_date = None
     if args.due:
-        try:
-            due_days = int(args.due)
-            due_date = (datetime.now() + timedelta(days=due_days)).strftime("%Y-%m-%dT09:00:00")
-        except ValueError:
-            due_date = args.due
+        # Handle relative dates like "2d" (2 days) or plain number
+        if args.due.endswith("d"):
+            try:
+                days = int(args.due[:-1])
+                due_datetime = datetime.now() + timedelta(days=days)
+            except ValueError:
+                print(f"❌ Invalid format for due date days: {args.due}")
+                return
+        elif args.due.isdigit():
+            # Plain number means days
+            days = int(args.due)
+            due_datetime = datetime.now() + timedelta(days=days)
+        else:
+            # Assume it's a date string (YYYY-MM-DD)
+            try:
+                due_datetime = datetime.fromisoformat(args.due)
+            except ValueError:
+                print(f"❌ Invalid date format for due date: {args.due}")
+                print("   Use YYYY-MM-DD, or relative format like '2d' or just '3'.")
+                return
+        
+        # Format as date-only (API requirement: time is ignored)
+        due_date = due_datetime.strftime("%Y-%m-%d") + "T00:00:00"
+
+    # Calculate reminder date/time (supports precise time)
+    reminder_date = None
+    if args.reminder:
+        # Handle relative times like "2d" (2 days) or "3h" (3 hours)
+        if args.reminder.endswith("h"):
+            try:
+                hours = int(args.reminder[:-1])
+                reminder_datetime = datetime.now() + timedelta(hours=hours)
+            except ValueError:
+                print(f"❌ Invalid format for reminder hours: {args.reminder}")
+                return
+        elif args.reminder.endswith("d"):
+            try:
+                days = int(args.reminder[:-1])
+                reminder_datetime = datetime.now() + timedelta(days=days)
+            except ValueError:
+                print(f"❌ Invalid format for reminder days: {args.reminder}")
+                return
+        else:
+            # Try to parse as datetime string
+            # Support formats: YYYY-MM-DD HH:MM, YYYY-MM-DDTHH:MM:SS, YYYY-MM-DD
+            try:
+                # First try ISO format
+                reminder_datetime = datetime.fromisoformat(args.reminder)
+            except ValueError:
+                # Try space-separated date and time: "2026-03-15 14:30"
+                try:
+                    reminder_datetime = datetime.strptime(args.reminder, "%Y-%m-%d %H:%M")
+                except ValueError:
+                    # Try date only: "2026-03-15" (will default to 09:00)
+                    try:
+                        date_only = datetime.strptime(args.reminder, "%Y-%m-%d")
+                        reminder_datetime = date_only.replace(hour=9, minute=0, second=0)
+                    except ValueError:
+                        print(f"❌ Invalid datetime format for reminder: {args.reminder}")
+                        print("   Supported formats:")
+                        print("   - Relative: '3h' (3 hours), '2d' (2 days)")
+                        print("   - Date+Time: '2026-12-31 14:30' or '2026-12-31T14:30:00'")
+                        print("   - Date only: '2026-12-31' (defaults to 09:00)")
+                        return
+        
+        reminder_date = reminder_datetime.isoformat()
+
+    # Parse recurrence pattern and prepare start date
+    recurrence = None
+    start_date = None
+    
+    if args.recurrence:
+        # For recurring tasks, we need both start date and due date
+        # Use due date if provided, otherwise default to 7 days from start
+        if due_date:
+            start_datetime = datetime.fromisoformat(due_date.replace("T00:00:00", ""))
+        else:
+            start_datetime = datetime.now()
+            # Set default due date to 7 days from start for recurring tasks
+            due_date = (start_datetime + timedelta(days=7)).strftime("%Y-%m-%dT00:00:00")
+        
+        recurrence = _parse_recurrence(args.recurrence, start_datetime)
+        if recurrence is None:
+            return  # Error already printed in _parse_recurrence
+        
+        # Set start date for recurring tasks (required)
+        start_date = start_datetime.strftime("%Y-%m-%dT09:00:00")
 
     # Create task
     task = client.create_task(
         list_id=task_list["id"],
         title=args.title,
         body=args.description,
+        start_date=start_date,
         due_date=due_date,
+        reminder_date=reminder_date,
         importance=args.priority,
         categories=args.tags.split(",") if args.tags else None,
+        recurrence=recurrence,
     )
 
     print(f"\n✓ Task added: {task['title']}")
+    if recurrence:
+        print("  🔄 Recurring task created")
     if args.verbose:
         print(f"  ID: {task['id']}")
         print(f"  Priority: {task['importance']}")
+        if task.get("startDateTime"):
+            print(f"  Start date: {task['startDateTime']['dateTime']}")
         if task.get("dueDateTime"):
             print(f"  Due date: {task['dueDateTime']['dateTime']}")
+        if task.get("reminderDateTime"):
+            print(f"  Reminder: {task['reminderDateTime']['dateTime']}")
+        if task.get("recurrence"):
+            pattern = task['recurrence']['pattern']
+            print(f"  Recurrence: {pattern.get('type', 'unknown')} (interval: {pattern.get('interval', 1)})")
 
 
 def cmd_complete(args, client):
     """Mark task as completed"""
-    task_list = _get_list_or_error(client, args.list)
+    # Determine which list to use
+    if args.list:
+        task_list = _get_list_or_error(client, args.list)
+    else:
+        task_list = client.get_default_list()
+    
     if not task_list:
+        print("❌ No task lists found")
         return
 
     task = _get_task_or_error(client, task_list["id"], args.title)
@@ -574,8 +795,14 @@ def cmd_complete(args, client):
 
 def cmd_delete(args, client):
     """Delete a task"""
-    task_list = _get_list_or_error(client, args.list)
+    # Determine which list to use
+    if args.list:
+        task_list = _get_list_or_error(client, args.list)
+    else:
+        task_list = client.get_default_list()
+    
     if not task_list:
+        print("❌ No task lists found")
         return
 
     task = _get_task_or_error(client, task_list["id"], args.title)
@@ -807,8 +1034,14 @@ def cmd_delete_list(args, client):
 
 def cmd_detail(args, client):
     """View task details"""
-    task_list = _get_list_or_error(client, args.list)
+    # Determine which list to use
+    if args.list:
+        task_list = _get_list_or_error(client, args.list)
+    else:
+        task_list = client.get_default_list()
+    
     if not task_list:
+        print("❌ No task lists found")
         return
 
     tasks = client.get_tasks(task_list["id"])
@@ -876,6 +1109,40 @@ def cmd_detail(args, client):
     if task.get("categories"):
         print(f"\n🏷️  Categories: {', '.join(task['categories'])}")
 
+    # Recurrence info
+    if task.get("recurrence"):
+        pattern = task["recurrence"]["pattern"]
+        pattern_type = pattern.get("type", "unknown")
+        interval = pattern.get("interval", 1)
+        
+        print(f"\n🔄 Recurrence:")
+        if pattern_type == "daily":
+            if interval == 1:
+                print("   Every day")
+            else:
+                print(f"   Every {interval} days")
+        elif pattern_type == "weekly":
+            days = pattern.get("daysOfWeek", [])
+            if interval == 1:
+                print(f"   Every week on {', '.join(days).title()}")
+            else:
+                print(f"   Every {interval} weeks on {', '.join(days).title()}")
+        elif pattern_type == "absoluteMonthly":
+            day = pattern.get("dayOfMonth", 1)
+            if interval == 1:
+                print(f"   Every month on day {day}")
+            else:
+                print(f"   Every {interval} months on day {day}")
+        
+        rec_range = task["recurrence"].get("range", {})
+        range_type = rec_range.get("type")
+        if range_type == "noEnd":
+            print(f"   Start date: {rec_range.get('startDate', 'N/A')}")
+            print("   No end date")
+        elif range_type == "endDate":
+            print(f"   Start: {rec_range.get('startDate', 'N/A')}")
+            print(f"   End: {rec_range.get('endDate', 'N/A')}")
+
     # Technical info
     if args.verbose:
         print("\n" + "─" * 60)
@@ -916,6 +1183,7 @@ def create_parser():
     )
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Show detailed information")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode (show API requests and responses)")
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -929,8 +1197,16 @@ def create_parser():
     # Task operations
     add_parser = subparsers.add_parser("add", help="Add a new task")
     add_parser.add_argument("title", help="Task title")
-    add_parser.add_argument("-l", "--list", default="Tasks", help="List name (default: Tasks)")
-    add_parser.add_argument("-d", "--due", help="Due date (days or date)")
+    add_parser.add_argument("-l", "--list", help="List name (if not specified, uses your default list)")
+    add_parser.add_argument("-d", "--due", help="Due date (e.g., '3' or '2d' for 2 days, '2026-12-31' for specific date). Note: Time is not supported for due dates.")
+    add_parser.add_argument("-r", "--reminder",
+                           help="Reminder time. Formats: '3h' (hours), '2d' (days), "
+                                "'2026-12-31 14:30' (date+time), '2026-12-31T14:30:00' (ISO), "
+                                "'2026-12-31' (date only, defaults to 09:00)")
+    add_parser.add_argument("-R", "--recurrence",
+                           help="Recurrence pattern. Formats: 'daily', 'weekdays', 'weekly', "
+                                "'monthly', or with interval like 'daily:2' (every 2 days), "
+                                "'weekly:3' (every 3 weeks)")
     add_parser.add_argument("-p", "--priority", choices=["low", "normal", "high"], default="normal", help="Priority")
     add_parser.add_argument("-D", "--description", help="Task description")
     add_parser.add_argument("-t", "--tags", help="Tags (comma separated)")
@@ -938,16 +1214,16 @@ def create_parser():
 
     complete_parser = subparsers.add_parser("complete", help="Mark task as completed")
     complete_parser.add_argument("title", help="Task title")
-    complete_parser.add_argument("-l", "--list", default="Tasks", help="List name (default: Tasks)")
+    complete_parser.add_argument("-l", "--list", help="List name (if not specified, uses your default list)")
 
     delete_parser = subparsers.add_parser("delete", help="Delete task")
     delete_parser.add_argument("title", help="Task title")
-    delete_parser.add_argument("-l", "--list", default="Tasks", help="List name (default: Tasks)")
+    delete_parser.add_argument("-l", "--list", help="List name (if not specified, uses your default list)")
     delete_parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmation")
 
     detail_parser = subparsers.add_parser("detail", help="View task details")
     detail_parser.add_argument("title", help="Task title (supports partial match)")
-    detail_parser.add_argument("-l", "--list", default="Tasks", help="List name (default: Tasks)")
+    detail_parser.add_argument("-l", "--list", help="List name (if not specified, uses your default list)")
 
     search_parser = subparsers.add_parser("search", help="Search for tasks")
     search_parser.add_argument("keyword", help="Search keyword")
@@ -995,7 +1271,7 @@ def main():
         return
 
     # Create client
-    client = MicrosoftTodoClient()
+    client = MicrosoftTodoClient(debug=args.debug)
 
     # Logout and login commands don't need authentication
     if args.command == "logout":
