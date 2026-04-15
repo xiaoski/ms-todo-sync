@@ -4,22 +4,22 @@ Microsoft To Do API Access Script
 Access To Do lists and tasks using Microsoft Graph API
 
 New CLI Design (v2):
-- todo list/ls              - List all task lists
-- todo list add <name>      - Create new list
-- todo list remove <name>   - Delete list
-- todo show [<list>]        - Show tasks (default or specific list)
-- todo add <title>          - Add new task
-- todo done <id-or-title>   - Mark task as done
-- todo remove <id-or-title> - Delete task
-- todo view <id-or-title>   - View task details
-- todo find <keyword>       - Search tasks
-- todo today                - Show today's tasks
-- todo overdue               - Show overdue tasks
-- todo pending/all           - Show all pending tasks
-- todo stats                 - Show statistics
-- todo export                - Export tasks
-- todo login                 - Login
-- todo logout                - Logout
+- uv run scripts/ms-todo-sync.py list/ls              - List all task lists
+- uv run scripts/ms-todo-sync.py list add <name>      - Create new list
+- uv run scripts/ms-todo-sync.py list remove <name>   - Delete list
+- uv run scripts/ms-todo-sync.py show [<list>]        - Show tasks (default or specific list)
+- uv run scripts/ms-todo-sync.py add <title>          - Add new task
+- uv run scripts/ms-todo-sync.py done <id-or-title>   - Mark task as done
+- uv run scripts/ms-todo-sync.py remove <id-or-title> - Delete task
+- uv run scripts/ms-todo-sync.py view <id-or-title>   - View task details
+- uv run scripts/ms-todo-sync.py find <keyword>       - Search tasks
+- uv run scripts/ms-todo-sync.py today                - Show today's tasks
+- uv run scripts/ms-todo-sync.py overdue              - Show overdue tasks
+- uv run scripts/ms-todo-sync.py pending/all          - Show all pending tasks
+- uv run scripts/ms-todo-sync.py stats                - Show statistics
+- uv run scripts/ms-todo-sync.py export               - Export tasks
+- uv run scripts/ms-todo-sync.py login                - Login
+- uv run scripts/ms-todo-sync.py logout               - Logout
 """
 
 # type: ignore  # Ignore missing type hints in msal library
@@ -144,7 +144,7 @@ class MicrosoftTodoClient:
 
         if not os.path.exists(flow_cache_file):
             print("✗ No flow information found to verify")
-            print("Please run first: todo login")
+            print("Please run first: uv run scripts/ms-todo-sync.py login")
             return False
 
         try:
@@ -1314,7 +1314,7 @@ def cmd_login(args, client: MicrosoftTodoClient) -> None:
         if args.json:
             _print_json_result(True, message="Login successful")
         elif not args.quiet:
-            print("✓ You can now start using todo")
+            print("✓ You can now start using ms-todo-sync.py")
         else:
             print("Login successful")
     else:
@@ -1333,9 +1333,9 @@ def cmd_logout(args, client: MicrosoftTodoClient) -> None:
 def create_parser() -> argparse.ArgumentParser:
     """Create command line argument parser"""
     parser = argparse.ArgumentParser(
-        prog="todo",
+        prog="ms-todo-sync.py",
         description="Microsoft To Do command line tool",
-        epilog='Example: todo add "Complete report" -l work -p high -d 3',
+        epilog='Example: uv run scripts/ms-todo-sync.py add "Complete report" -l work -p high -d 3',
     )
 
     parser.add_argument("-q", "--quiet", action="store_true", help="Quiet mode, only output IDs or errors")
@@ -1512,7 +1512,7 @@ def main() -> None:
 
     # Other commands require authentication
     if not client.authenticate():
-        _print_error(args, "Not logged in. Please run: todo login")
+        _print_error(args, "Not logged in. Please run: uv run scripts/ms-todo-sync.py login")
 
     # Command mapping
     commands: Dict[str, Callable] = {

@@ -39,16 +39,16 @@ Microsoft To Do command-line client, manages tasks and lists via Microsoft Graph
 
 | Goal | Command | Alias |
 |------|---------|-------|
-| View all lists | `todo list` | `todo ls` |
-| Add task (default list) | `todo add "task title"` | `todo new` |
-| Add task to list | `todo add "task title" -l "list name"` | - |
-| View all pending tasks | `todo pending` | `todo all` |
-| View today's tasks | `todo today` | - |
-| View overdue tasks | `todo overdue` | - |
-| Search tasks | `todo find "keyword"` | `todo search` |
-| Filter incomplete | `todo find --incomplete` | - |
-| Complete task | `todo done <ID or title>` | `todo complete` |
-| Delete task (skip confirm) | `todo remove <ID or title> -y` | `todo rm` |
+| View all lists | `uv run scripts/ms-todo-sync.py list` | `uv run scripts/ms-todo-sync.py ls` |
+| Add task (default list) | `uv run scripts/ms-todo-sync.py add "task title"` | `uv run scripts/ms-todo-sync.py new` |
+| Add task to list | `uv run scripts/ms-todo-sync.py add "task title" -l "list name"` | - |
+| View all pending tasks | `uv run scripts/ms-todo-sync.py pending` | `uv run scripts/ms-todo-sync.py all` |
+| View today's tasks | `uv run scripts/ms-todo-sync.py today` | - |
+| View overdue tasks | `uv run scripts/ms-todo-sync.py overdue` | - |
+| Search tasks | `uv run scripts/ms-todo-sync.py find "keyword"` | `uv run scripts/ms-todo-sync.py search` |
+| Filter incomplete | `uv run scripts/ms-todo-sync.py find --incomplete` | - |
+| Complete task | `uv run scripts/ms-todo-sync.py done <ID or title>` | `uv run scripts/ms-todo-sync.py complete` |
+| Delete task (skip confirm) | `uv run scripts/ms-todo-sync.py remove <ID or title> -y` | `uv run scripts/ms-todo-sync.py rm` |
 
 ### Agent Recommended Workflow
 
@@ -57,17 +57,17 @@ Use ID-based operations for reliability:
 ```
 1. cd <skill_directory> (must run all commands from SKILL.md directory)
 2. Check dependencies: uv sync (run if ModuleNotFoundError occurs)
-3. Verify login: todo list
-   - If "Not logged in" → run: todo login
-4. Get task IDs: todo -q pending (quiet mode, ID only)
-   or: todo -j pending (JSON format with details)
-5. Use ID for operations: todo done <id>, todo remove <id> -y, todo view <id>
+3. Verify login: uv run scripts/ms-todo-sync.py list
+   - If "Not logged in" → run: uv run scripts/ms-todo-sync.py login
+4. Get task IDs: uv run scripts/ms-todo-sync.py -q pending (quiet mode, ID only)
+   or: uv run scripts/ms-todo-sync.py -j pending (JSON format with details)
+5. Use ID for operations: uv run scripts/ms-todo-sync.py done <id>, uv run scripts/ms-todo-sync.py remove <id> -y, uv run scripts/ms-todo-sync.py view <id>
 ```
 
 ### Login Flow
 
 ```bash
-todo login
+uv run scripts/ms-todo-sync.py login
 ```
 
 Single-step device code flow:
@@ -88,7 +88,7 @@ Choose list based on context:
 
 ### Agent Key Rules
 
-⚠️ **Global options must come before subcommand**: `-q/-j/-v/--debug` must precede the command, e.g. `todo -j list`
+⚠️ **Global options must come before subcommand**: `-q/-j/-v/--debug` must precede the command, e.g. `uv run scripts/ms-todo-sync.py -j list`
 ⚠️ **Smart task detection**: `done`/`remove`/`view` auto-detect ID or title
 ⚠️ **Recommend ID usage**: Get ID first via `-q` or `-j`, then operate by ID
 ⚠️ **Quiet mode**: `-q` outputs ID only, good for scripts and pipes
@@ -121,7 +121,7 @@ uv sync  # Install dependencies (recommended)
 ### Verify Installation
 
 ```bash
-todo --help
+uv run scripts/ms-todo-sync.py --help
 ```
 
 ---
@@ -131,7 +131,7 @@ todo --help
 All commands follow this format:
 
 ```
-todo [GLOBAL_OPTIONS] <command> [COMMAND_OPTIONS]
+uv run scripts/ms-todo-sync.py [GLOBAL_OPTIONS] <command> [COMMAND_OPTIONS]
 ```
 
 ### Global Options
@@ -184,13 +184,13 @@ All commands support `-j/--json` with unified output format:
 **Examples:**
 ```bash
 # Get all lists in JSON
-todo -j list
+uv run scripts/ms-todo-sync.py -j list
 
 # Get pending tasks in JSON (includes task IDs)
-todo -j pending
+uv run scripts/ms-todo-sync.py -j pending
 
 # Add task and get JSON response
-todo -j add "test task"
+uv run scripts/ms-todo-sync.py -j add "test task"
 ```
 
 ---
@@ -200,7 +200,7 @@ todo -j add "test task"
 #### `login` — Login (single-step)
 
 ```bash
-todo login
+uv run scripts/ms-todo-sync.py login
 ```
 
 **Note**: This is an interactive command requiring browser login. **Do NOT** use with `-j` or `-q` options.
@@ -220,7 +220,7 @@ Press Enter after you have completed login in the browser...
 #### `logout` — Clear login info
 
 ```bash
-todo logout
+uv run scripts/ms-todo-sync.py logout
 ```
 
 Use only when user explicitly requests account switch or clearing login data.
@@ -232,25 +232,25 @@ Use only when user explicitly requests account switch or clearing login data.
 #### `list` / `ls` — List all task lists
 
 ```bash
-todo list
-todo ls  # alias
-todo -q list  # quiet mode, ID only
-todo -j list  # JSON format
-todo -v list  # detailed info
+uv run scripts/ms-todo-sync.py list
+uv run scripts/ms-todo-sync.py ls  # alias
+uv run scripts/ms-todo-sync.py -q list  # quiet mode, ID only
+uv run scripts/ms-todo-sync.py -j list  # JSON format
+uv run scripts/ms-todo-sync.py -v list  # detailed info
 ```
 
 #### `list add` / `new-list` — Create new list
 
 ```bash
-todo list add "<name>"
-todo new-list "<name>"  # alias
+uv run scripts/ms-todo-sync.py list add "<name>"
+uv run scripts/ms-todo-sync.py new-list "<name>"  # alias
 ```
 
 #### `list remove` / `rm-list` — Delete list
 
 ```bash
-todo list remove "<name>" [-y]
-todo rm-list "<name>" [-y]  # alias
+uv run scripts/ms-todo-sync.py list remove "<name>" [-y]
+uv run scripts/ms-todo-sync.py rm-list "<name>" [-y]  # alias
 ```
 
 | Option | Description |
@@ -264,11 +264,11 @@ todo rm-list "<name>" [-y]  # alias
 #### `show` / `tasks` — Show tasks in a list
 
 ```bash
-todo show              # Show default list tasks (incomplete only by default)
-todo show "<list>"     # Show tasks in specific list
-todo tasks             # alias
-todo show -a           # Include completed tasks
-todo -j show           # JSON format
+uv run scripts/ms-todo-sync.py show              # Show default list tasks (incomplete only by default)
+uv run scripts/ms-todo-sync.py show "<list>"     # Show tasks in specific list
+uv run scripts/ms-todo-sync.py tasks             # alias
+uv run scripts/ms-todo-sync.py show -a           # Include completed tasks
+uv run scripts/ms-todo-sync.py -j show           # JSON format
 ```
 
 | Option | Description |
@@ -282,8 +282,8 @@ todo -j show           # JSON format
 #### `add` / `new` — Add new task
 
 ```bash
-todo add "<title>" [options]
-todo new "<title>" [options]  # alias
+uv run scripts/ms-todo-sync.py add "<title>" [options]
+uv run scripts/ms-todo-sync.py new "<title>" [options]  # alias
 ```
 
 | Option | Required | Default | Description |
@@ -304,8 +304,8 @@ todo new "<title>" [options]  # alias
 #### `done` / `complete` — Mark task as completed
 
 ```bash
-todo done <ID or title> [-l "<list>"]
-todo complete <ID or title> [-l "<list>"]  # alias
+uv run scripts/ms-todo-sync.py done <ID or title> [-l "<list>"]
+uv run scripts/ms-todo-sync.py complete <ID or title> [-l "<list>"]  # alias
 ```
 
 | Option | Description |
@@ -317,8 +317,8 @@ todo complete <ID or title> [-l "<list>"]  # alias
 #### `remove` / `rm` — Delete task
 
 ```bash
-todo remove <ID or title> [-l "<list>"] [-y]
-todo rm <ID or title> [-l "<list>"] [-y]  # alias
+uv run scripts/ms-todo-sync.py remove <ID or title> [-l "<list>"] [-y]
+uv run scripts/ms-todo-sync.py rm <ID or title> [-l "<list>"] [-y]  # alias
 ```
 
 | Option | Description |
@@ -331,8 +331,8 @@ todo rm <ID or title> [-l "<list>"] [-y]  # alias
 #### `view` / `info` — View task details
 
 ```bash
-todo view <ID or title> [-l "<list>"]
-todo info <ID or title> [-l "<list>"]  # alias
+uv run scripts/ms-todo-sync.py view <ID or title> [-l "<list>"]
+uv run scripts/ms-todo-sync.py info <ID or title> [-l "<list>"]  # alias
 ```
 
 | Option | Description |
@@ -348,26 +348,26 @@ todo info <ID or title> [-l "<list>"]  # alias
 #### `find` / `search` — Search and filter tasks
 
 ```bash
-todo find "<keyword>"                    # Search tasks containing keyword
-todo find                                # List all tasks (no keyword = pure filter)
-todo find --incomplete                   # Show only incomplete tasks
-todo find --completed                    # Show only completed tasks
-todo find --created-after "2026-01-01"   # Filter by creation date
-todo find --created-before "2026-04-01"  # Filter by creation date
-todo find --due-after "2026-04-01"        # Filter by due date
-todo find --due-before "2026-04-15"      # Filter by due date
+uv run scripts/ms-todo-sync.py find "<keyword>"                    # Search tasks containing keyword
+uv run scripts/ms-todo-sync.py find                                # List all tasks (no keyword = pure filter)
+uv run scripts/ms-todo-sync.py find --incomplete                   # Show only incomplete tasks
+uv run scripts/ms-todo-sync.py find --completed                    # Show only completed tasks
+uv run scripts/ms-todo-sync.py find --created-after "2026-01-01"   # Filter by creation date
+uv run scripts/ms-todo-sync.py find --created-before "2026-04-01"  # Filter by creation date
+uv run scripts/ms-todo-sync.py find --due-after "2026-04-01"        # Filter by due date
+uv run scripts/ms-todo-sync.py find --due-before "2026-04-15"      # Filter by due date
 ```
 
 **Combined filter examples:**
 ```bash
 # Incomplete tasks due this week
-todo find --due-after "2026-04-13" --due-before "2026-04-19" --incomplete
+uv run scripts/ms-todo-sync.py find --due-after "2026-04-13" --due-before "2026-04-19" --incomplete
 
 # Search and show incomplete only
-todo find "report" --incomplete
+uv run scripts/ms-todo-sync.py find "report" --incomplete
 
 # Search tasks created in date range
-todo find "project" --created-after "2026-04-01"
+uv run scripts/ms-todo-sync.py find "project" --created-after "2026-04-01"
 ```
 
 | Option | Description |
@@ -405,23 +405,23 @@ todo find "project" --created-after "2026-04-01"
 #### `today` — Tasks due today
 
 ```bash
-todo today
-todo -j today  # JSON format
+uv run scripts/ms-todo-sync.py today
+uv run scripts/ms-todo-sync.py -j today  # JSON format
 ```
 
 #### `overdue` — Overdue tasks
 
 ```bash
-todo overdue
-todo -j overdue  # JSON format
+uv run scripts/ms-todo-sync.py overdue
+uv run scripts/ms-todo-sync.py -j overdue  # JSON format
 ```
 
 #### `pending` / `all` — All incomplete tasks
 
 ```bash
-todo pending
-todo pending -g  # Group by list
-todo all  # alias (supports -g too)
+uv run scripts/ms-todo-sync.py pending
+uv run scripts/ms-todo-sync.py pending -g  # Group by list
+uv run scripts/ms-todo-sync.py all  # alias (supports -g too)
 ```
 
 | Option | Description |
@@ -431,13 +431,13 @@ todo all  # alias (supports -g too)
 #### `stats` — Task statistics
 
 ```bash
-todo stats
+uv run scripts/ms-todo-sync.py stats
 ```
 
 #### `export` — Export all tasks to JSON
 
 ```bash
-todo export [-o "<filename>"]
+uv run scripts/ms-todo-sync.py export [-o "<filename>"]
 ```
 
 | Option | Default | Description |
@@ -450,31 +450,31 @@ todo export [-o "<filename>"]
 
 ```bash
 # View all lists
-todo list
+uv run scripts/ms-todo-sync.py list
 
 # Add task to specific list (list auto-created if needed)
-todo add "Report" -l "Work" -p high -d 3 -n "Q4 Finance"
+uv run scripts/ms-todo-sync.py add "Report" -l "Work" -p high -d 3 -n "Q4 Finance"
 
 # Add task to default list
-todo add "Buy milk"
+uv run scripts/ms-todo-sync.py add "Buy milk"
 
 # Add task with 2-hour reminder
-todo add "Call client" -r 2h
+uv run scripts/ms-todo-sync.py add "Call client" -r 2h
 
 # Agent recommended: get ID first, then operate
-todo -q pending          # Get all pending task IDs
-todo -j pending          # Get JSON format (with details)
-todo done <id>           # Complete by ID
-todo remove <id> -y      # Delete by ID
+uv run scripts/ms-todo-sync.py -q pending          # Get all pending task IDs
+uv run scripts/ms-todo-sync.py -j pending          # Get JSON format (with details)
+uv run scripts/ms-todo-sync.py done <id>           # Complete by ID
+uv run scripts/ms-todo-sync.py remove <id> -y      # Delete by ID
 
 # Search then view
-todo find "report"
-todo view "report"
+uv run scripts/ms-todo-sync.py find "report"
+uv run scripts/ms-todo-sync.py view "report"
 
 # Views
-todo -v pending -g       # All pending, grouped, verbose
-todo -j today            # Today's tasks (JSON)
-todo export -o "backup.json"  # Full export
+uv run scripts/ms-todo-sync.py -v pending -g       # All pending, grouped, verbose
+uv run scripts/ms-todo-sync.py -j today            # Today's tasks (JSON)
+uv run scripts/ms-todo-sync.py export -o "backup.json"  # Full export
 ```
 
 ---

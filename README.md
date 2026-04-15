@@ -42,7 +42,7 @@ uv sync
 A single-step device code flow — no need to register your own Azure app:
 
 ```bash
-todo login
+uv run scripts/ms-todo-sync.py login
 ```
 
 You'll see a URL and a verification code. Open the URL in your browser, enter the code, and sign in with your Microsoft account. Then press Enter in the terminal.
@@ -53,22 +53,22 @@ The token is cached to `~/.mstodo_token_cache.json` — you won't need to log in
 
 ```bash
 # List all task lists
-todo list
+uv run scripts/ms-todo-sync.py list
 
 # Add a task
-todo add "Buy groceries" -l "Shopping" -p high -d 2
+uv run scripts/ms-todo-sync.py add "Buy groceries" -l "Shopping" -p high -d 2
 
 # View all pending tasks grouped by list
-todo pending -g
+uv run scripts/ms-todo-sync.py pending -g
 
 # Mark a task as done
-todo done "Buy groceries" -l "Shopping"
+uv run scripts/ms-todo-sync.py done "Buy groceries" -l "Shopping"
 
 # Search tasks
-todo find "report"
+uv run scripts/ms-todo-sync.py find "report"
 
 # Search with filters (incomplete, due this week)
-todo find --incomplete --due-after "2026-04-13" --due-before "2026-04-19"
+uv run scripts/ms-todo-sync.py find --incomplete --due-after "2026-04-13" --due-before "2026-04-19"
 ```
 
 ## Command Overview
@@ -92,7 +92,7 @@ todo find --incomplete --due-after "2026-04-13" --due-before "2026-04-19"
 | `login` | Authentication |
 | `logout` | Clear cached tokens |
 
-Run `todo --help` for full details, or see [SKILL.md](SKILL.md) for the complete reference.
+Run `uv run scripts/ms-todo-sync.py --help` for full details, or see [SKILL.md](SKILL.md) for the complete reference.
 
 ## Agent Integration
 
@@ -110,14 +110,14 @@ Point your agent to the directory containing `SKILL.md`. The agent will automati
 
 ```bash
 # 1. Check current state
-todo -j pending          # Get JSON with all task IDs
+uv run scripts/ms-todo-sync.py -j pending          # Get JSON with all task IDs
 
 # 2. Perform operations using IDs (more reliable)
-todo done <id>
-todo remove <id> -y
+uv run scripts/ms-todo-sync.py done <id>
+uv run scripts/ms-todo-sync.py remove <id> -y
 
 # 3. Search with filters
-todo find --incomplete --due-after "2026-04-01"
+uv run scripts/ms-todo-sync.py find --incomplete --due-after "2026-04-01"
 ```
 
 ### JSON Output
